@@ -12,6 +12,7 @@ import it.unibo.scafi.space.graphics2D.BasicShape2D.Circle
 
 object Incarnation extends BasicAbstractIncarnation
 import lab.demo.Incarnation._ //import all stuff from an incarnation
+import lab.demo.Incarnation.Builtins.Bounded;
 
 object Simulation extends App {
 
@@ -28,8 +29,8 @@ object Simulation extends App {
     case x => x.toString
   }
 
-  val programClass = classOf[Main11]
-  val nodes = 100
+  val programClass = classOf[Main]
+  val nodes = 500
   val neighbourRange = 200
   val (width, height) = (1920, 1080)
   ViewSetting.windowConfiguration = WindowConfiguration(width, height)
@@ -42,81 +43,29 @@ object Simulation extends App {
   ).launch()
 }
 
-abstract class AggregateProgramSkeleton extends AggregateProgram with StandardSensors {
-  def sense1 = sense[Boolean]("sens1")
-  def sense2 = sense[Boolean]("sens2")
-  def sense3 = sense[Boolean]("sens3")
-  def boolToInt(b: Boolean) = mux(b){1}{0}
-}
+class Main extends AggregateProgram with StandardSensors {
 
-class Main extends AggregateProgramSkeleton {
-  override def main() = 1
-}
+  case class Msg(distance: Double, id: Int, symBreaker: Int)
+  implicit object BoundedMsg extends Bounded[Msg]{
+    override def bottom: Msg = Msg(0.0, mid, mid)
+    override def top: Msg = Msg(0.0, mid, Int.MaxValue)
+    override def compare(a: Msg, b: Msg): Int =
+      if (a.symBreaker == b.symBreaker)
+        a.distance.compareTo(b.distance)
+      else
+        a.symBreaker.compareTo(b.symBreaker)
+  }
 
-class Main1 extends AggregateProgramSkeleton {
-  override def main() = 1
-}
+  def S(grain: Double): ID =
+    rep(Msg(0.0, mid, mid)){ case Msg(d,i,s) =>
+      minHood[Msg]{
+        Msg(nbr{d} + nbrRange, nbr{i}, nbr{s}) match {
+          case Msg(_, id, _) if (id == mid) => implicitly[Bounded[Msg]].bottom
+          case Msg(dd, _, _) if (dd >= grain) => implicitly[Bounded[Msg]].top
+          case m => m
+        }
+      }
+    }.id
 
-class Main2 extends AggregateProgramSkeleton {
-  override def main() = 2+3
-}
-
-class Main3 extends AggregateProgramSkeleton {
-  override def main() = (10,20)
-}
-
-class Main4 extends AggregateProgramSkeleton {
-  override def main() = Math.random()
-}
-
-class Main5 extends AggregateProgramSkeleton {
-  override def main() = sense1
-}
-
-class Main6 extends AggregateProgramSkeleton {
-  override def main() = if (sense1) 10 else 20
-}
-
-class Main7 extends AggregateProgramSkeleton {
-  override def main() = mid()
-}
-
-class Main8 extends AggregateProgramSkeleton {
-  override def main() = minHoodPlus(nbrRange)
-}
-
-class Main9 extends AggregateProgramSkeleton {
-  override def main() = rep(0){_+1}
-}
-
-class Main10 extends AggregateProgramSkeleton {
-  override def main() = rep(Math.random()){x=>x}
-}
-
-class Main11 extends AggregateProgramSkeleton {
-  override def main() = rep[Double](0.0){x => x + rep(Math.random()){y=>y}}
-}
-
-class Main12 extends AggregateProgramSkeleton {
-  import Builtins.Bounded.of_i
-
-  override def main() = maxHoodPlus(boolToInt(nbr{sense1}))
-}
-
-class Main13 extends AggregateProgramSkeleton {
-  override def main() = foldhoodPlus(0)(_+_){nbr{1}}
-}
-
-class Main14 extends AggregateProgramSkeleton {
-  import Builtins.Bounded.of_i
-
-  override def main() = rep(0){ x => boolToInt(sense1) max maxHoodPlus( nbr{x}) }
-}
-
-class Main15 extends AggregateProgramSkeleton {
-  override def main() = rep(Double.MaxValue){ d => mux[Double](sense1){0.0}{minHoodPlus(nbr{d}+1.0)} }
-}
-
-class Main16 extends AggregateProgramSkeleton {
-  override def main() = rep(Double.MaxValue){ d => mux[Double](sense1){0.0}{minHoodPlus(nbr{d}+nbrRange)} }
+  override def main() = S(300)
 }
